@@ -2,7 +2,7 @@
 
 > **AI-Powered Stadium Operations Companion for FIFA World Cup 2026**
 
-🔗 **Live Demo:** [ADD_VERCEL_LINK_HERE]
+🔗 **Live Demo:** https://stadium-saathi.vercel.app/
 
 StadiumSaathi is an intelligent, real-time stadium management and fan companion platform built for the scale and complexity of the FIFA World Cup 2026. It bridges the gap between stadium operations teams and fans through live telemetry, Gemini AI insights, multilingual support, and a fully accessible web interface.
 
