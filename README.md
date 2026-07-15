@@ -11,8 +11,7 @@ StadiumSaathi is an intelligent, real-time stadium management and fan companion 
 ## Screenshots
 
 ### Organizer Operations Dashboard
-![Dashboard — Gate telemetry, zone heatmap, AI insights, and incident management](<img width="935" height="403" alt="dashboard" src="https://github.com/user-attachments/assets/e01da899-ad84-4505-b19c-51b93f448d7c" />
-)
+![Dashboard — Gate telemetry, zone heatmap, AI insights, and incident management]((docs/screenshots/dashboard.png)
 
 ### Fan Companion Portal
 ![Fan Portal — Interactive SVG stadium map and AI Navigation Advisor](docs/screenshots/fan-portal.png)
