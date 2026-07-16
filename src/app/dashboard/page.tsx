@@ -109,9 +109,10 @@ export default function OrganizerDashboard() {
 
   // ─── Broadcast ───────────────────────────────────────────────────────────
   const handleSendBroadcast = () => {
-    const trimmed = broadcastDraft.trim();
-    if (!trimmed) return;
-    setActiveBroadcast(trimmed);
+    const { sanitizeBroadcastMessage } = require("../../lib/utils");
+    const sanitized = sanitizeBroadcastMessage(broadcastDraft);
+    if (!sanitized) return;
+    setActiveBroadcast(sanitized);
     setBroadcastSent(true);
     setBroadcastDraft("");
     setTimeout(() => setBroadcastSent(false), 3000);

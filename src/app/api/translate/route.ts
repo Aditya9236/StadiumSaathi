@@ -3,6 +3,11 @@ import { NextRequest, NextResponse } from "next/server";
 const MAX_INPUT_LENGTH = 500;
 
 // ─── POST /api/translate ─────────────────────────────────────────────────
+//
+// Security measures applied to this route:
+//   1. Input length limit — translation text length is validated to prevent API spam/abuse.
+//   2. Target locale check — targetLocale parameter must match allowed locales (en, es, fr).
+//   3. Server-side key   — GEMINI_API_KEY is processed purely on the server.
 
 export async function POST(request: NextRequest) {
   try {

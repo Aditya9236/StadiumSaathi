@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Gate, Zone, Incident } from "../../../types/stadium";
+import { checkRateLimit, getClientIp } from "../../../lib/rateLimiter";
 
 const MAX_INPUT_LENGTH = 10000;
 const INJECTION_PATTERNS = /override system rules|ignore guidelines|developer console|system prompt|ignore previous|disregard instructions/gi;
@@ -171,9 +172,34 @@ function getStaticFallbackInsights(gates: Gate[], zones: Zone[], activeIncident:
 }
 
 // ─── POST /api/dashboard-insights ────────────────────────────────────────
+//
+// Security measures applied to this route:
+//   1. Rate limiting  — max 10 requests per minute per client IP (in-memory
+//      sliding-window via src/lib/rateLimiter.ts). Returns HTTP 429 when exceeded.
+//   2. Payload size   — payload is rejected when JSON body exceeds MAX_INPUT_LENGTH
+//      characters, preventing oversized request attacks.
+//   3. Injection guard — INJECTION_PATTERNS regex blocks common prompt-injection
+//      tokens (e.g. "ignore previous instructions") in the telemetry payload.
+//   4. Server-side key — GEMINI_API_KEY is read from process.env and never
+//      forwarded to the client response.
 
 export async function POST(request: NextRequest) {
   try {
+    // ── Rate limiting ────────────────────────────────────────────────────
+    const ip = getClientIp(request);
+    const rateCheck = checkRateLimit(ip);
+    if (!rateCheck.allowed) {
+      return NextResponse.json(
+        { error: "Too many requests. Please wait before trying again." },
+        {
+          status: 429,
+          headers: {
+            "Retry-After": String(Math.ceil(rateCheck.resetMs / 1000)),
+            "X-RateLimit-Remaining": "0",
+          },
+        }
+      );
+    }
     const body = await request.json();
     const { gates, zones, activeIncident } = body;
 

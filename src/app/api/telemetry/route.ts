@@ -45,6 +45,9 @@ function tickIfNeeded() {
 }
 
 // ─── GET /api/telemetry ──────────────────────────────────────────────────
+//
+// Security measures applied:
+//   - Read-only data access with internal automated rate/tick control (tickIfNeeded).
 
 export async function GET() {
   tickIfNeeded();
@@ -59,6 +62,10 @@ export async function GET() {
 }
 
 // ─── POST /api/telemetry ─────────────────────────────────────────────────
+//
+// Security measures applied:
+//   - Input type validation on parameters (action).
+//   - Fallback/error handling for invalid request bodies.
 
 export async function POST(request: NextRequest) {
   try {
@@ -94,6 +101,10 @@ export async function POST(request: NextRequest) {
 }
 
 // ─── PATCH /api/telemetry ────────────────────────────────────────────────
+//
+// Security measures applied:
+//   - Action/Input verification (requires VALID incident ID matching in-memory database).
+//   - Sanitized dispatch assignment parameters.
 
 export async function PATCH(request: NextRequest) {
   try {

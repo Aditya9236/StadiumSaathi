@@ -32,6 +32,12 @@ function heuristicClassify(item: string): { category: string; explanation: strin
 }
 
 // ─── POST /api/eco-sort ──────────────────────────────────────────────────
+//
+// Security measures applied to this route:
+//   1. Input length limit — items exceeding MAX_INPUT_LENGTH are rejected to prevent
+//      buffer/payload bloat.
+//   2. Type validation   — verifies that the submitted item is a string type.
+//   3. Server-side key   — API key for Gemini is kept strictly server-side.
 
 export async function POST(request: NextRequest) {
   try {

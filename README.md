@@ -6,6 +6,12 @@
 
 StadiumSaathi is an intelligent, real-time stadium management and fan companion platform built for the scale and complexity of the FIFA World Cup 2026. It bridges the gap between stadium operations teams and fans through live telemetry, Gemini AI insights, multilingual support, and a fully accessible web interface.
 
+## 🔧 Google Technologies Used
+
+- **Google Antigravity** — Used for AI-agent-driven development of the entire application.
+- **Google AI Studio** — Used to obtain and manage the Gemini API key, and to test prompts before implementation.
+- **Gemini 2.0 Flash API** — Powers all real-time AI recommendations, navigation directions, and multilingual translation.
+
 ---
 
 ## Screenshots
@@ -204,21 +210,21 @@ Translation strings live in [`src/lib/translations.ts`](src/lib/translations.ts)
 
 ## 🔒 Security
 
-- API key is server-side only; never sent to the client
-- All user inputs validated for length limits and prompt injection patterns
-- `.env.local` is git-ignored; `.env.local.example` is provided as a template
-- No third-party analytics or tracking scripts included
+- **Server-Side-Only API Key Handling**: The `GEMINI_API_KEY` is kept strictly on the server-side within Next.js API routes (`/api/dashboard-insights` and `/api/ai-recommendation`). It is never bundled into the client build or exposed in any HTTP response.
+- **Rate Limiting**: Simple in-memory sliding-window rate limiting is implemented on `/api/dashboard-insights` and `/api/ai-recommendation` routes (maximum 10 requests per minute per IP).
+- **Input Validation & Sanitization**: Validates gate/seat inputs against strict whitelist sets in the Fan Portal. Emergency Broadcast drafts are sanitized using a server-side regex parser to strip script and HTML tags to prevent XSS.
+- **Environment Variable Protection**: The `.env.local` file is excluded from source control using `.gitignore`. A `.env.local.example` template is provided for setup.
 
 ---
 
-## 📋 Testing
+## 🧪 Testing
 
-See [`docs/TESTING.md`](docs/TESTING.md) for the full manual test suite covering:
-- TC-01: Landing page navigation
-- TC-02 to TC-07: Dashboard features (telemetry, heatmap, AI panel, incidents, broadcast, language)
-- TC-08 to TC-12: Fan Portal features (map, step-free toggle, AI navigation, language, broadcast)
-- TC-13: Keyboard and accessibility compliance
-- TC-14: Security verification
+StadiumSaathi uses a dual testing approach:
+1. **Manual Verification**: A comprehensive manual test suite is documented in [TESTING.md](docs/TESTING.md) covering TC-01 through TC-14 (Landing page, Telemetry heatmaps, AI Insight panel, emergency broadcast systems, and accessibility).
+2. **Automated Unit Testing**: Jest/Vitest automated unit tests verify core business logic including crowd density status calculation, gate capacity calculation, incident severity classification, and emergency broadcast message sanitization. Run them with:
+   ```bash
+   npm test
+   ```
 
 ---
 

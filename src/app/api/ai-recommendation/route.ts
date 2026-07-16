@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
+import { checkRateLimit, getClientIp } from "../../../lib/rateLimiter";
 import {
-  initialGates,
-  initialZones,
-} from "../../../data/stadiumData";
+   initialGates,
+   initialZones,
+ } from "../../../data/stadiumData";
 
 const MAX_INPUT_LENGTH = 500;
 
@@ -103,9 +104,34 @@ function getStaticFallback(locale: string) {
 }
 
 // ─── POST /api/ai-recommendation ─────────────────────────────────────────
+//
+// Security measures applied to this route:
+//   1. Rate limiting  — max 10 requests per minute per client IP (in-memory
+//      sliding-window via src/lib/rateLimiter.ts). Returns HTTP 429 when exceeded.
+//   2. Payload size   — combined inputs are rejected when they exceed MAX_INPUT_LENGTH,
+//      preventing oversized payload attacks.
+//   3. Injection guard — INJECTION_PATTERNS regex blocks common prompt-injection
+//      tokens in the inputs.
+//   4. Server-side key — GEMINI_API_KEY is read from process.env and never
+//      forwarded to the client.
 
 export async function POST(request: NextRequest) {
   try {
+    // ── Rate limiting ────────────────────────────────────────────────────
+    const ip = getClientIp(request);
+    const rateCheck = checkRateLimit(ip);
+    if (!rateCheck.allowed) {
+      return NextResponse.json(
+        { error: "Too many requests. Please wait before trying again." },
+        {
+          status: 429,
+          headers: {
+            "Retry-After": String(Math.ceil(rateCheck.resetMs / 1000)),
+            "X-RateLimit-Remaining": "0",
+          },
+        }
+      );
+    }
     const body = await request.json();
     const { sourceGateId, destinationZoneId, stepFreeRequired, sensorySafeRequired, locale } = body;
 
