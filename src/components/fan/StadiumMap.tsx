@@ -34,7 +34,7 @@ function gateColor(gate: Gate): string {
  * Renders gate pins, POI icons, route paths, and filter toggles.
  * All interactive elements are keyboard-accessible buttons.
  */
-export const StadiumMap: React.FC<StadiumMapProps> = ({ gates, stepFreeMode, onNavigateToGate }) => {
+export const StadiumMap = React.memo<StadiumMapProps>(({ gates, stepFreeMode, onNavigateToGate }) => {
   const [activeFilters, setActiveFilters] = useState<Set<POIFilter>>(
     new Set(["CONCESSION", "RESTROOM", "FIRST_AID", "SENSORY_ROOM"])
   );
@@ -307,4 +307,7 @@ export const StadiumMap: React.FC<StadiumMapProps> = ({ gates, stepFreeMode, onN
       </div>
     </div>
   );
-};
+});
+
+StadiumMap.displayName = "StadiumMap";
+

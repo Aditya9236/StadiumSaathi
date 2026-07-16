@@ -12,7 +12,7 @@ interface IncidentBannerProps {
  * Displays active critical notifications on the dashboard.
  * Uses role="alert" to instantly notify assistive technologies.
  */
-export const IncidentBanner: React.FC<IncidentBannerProps> = ({
+export const IncidentBanner = React.memo<IncidentBannerProps>(({
   incident,
   onDismiss,
   onDispatch,
@@ -83,4 +83,7 @@ export const IncidentBanner: React.FC<IncidentBannerProps> = ({
       </div>
     </div>
   );
-};
+});
+
+IncidentBanner.displayName = "IncidentBanner";
+

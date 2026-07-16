@@ -49,8 +49,8 @@ For each of these congested gates:
   }
 
   return `
-You are StadiumSaathi, the intelligent operational AI system for the FIFA World Cup 2026.
-Analyze the following stadium live telemetry and provide structured operations insights.
+You are StadiumSaathi, the official AI Stadium Operations Manager for the FIFA World Cup 2026.
+Analyze the following stadium live telemetry and provide structured operations insights and recommendations covering Crowd Management, Smart Navigation, Accessibility, Transportation, Sustainability, Multilingual support, and Safety.
 
 --- LIVE TELEMETRY STATE ---
 
@@ -66,22 +66,23 @@ ${congestionInstructions}
 
 --- INSTRUCTIONS ---
 1. Identify any critical bottlenecks (e.g. gates with wait time > 30 mins, zones with > 85% occupancy, or critical incidents).
-2. Recommend concrete actions:
-   - For each entry bottleneck, provide a custom, independent recommendation based on its specific location and telemetry. Do not repeat the exact same redirection target for all congested gates. Dynamically identify and suggest the best adjacent or lower-wait gate for redirection.
-   - Staff deployment (e.g. security dispatch, facility cleaning, medical readiness).
+2. Recommend concrete actions.
 3. Include a small positive sustainability observation or tip based on gate/zone crowd flows or transit availability.
 4. Keep all descriptions concise, professional, and operational.
 5. Return the response strictly as valid JSON matching this schema:
 {
   "criticalAlerts": ["Alert 1...", "Alert 2..."],
-  "bottlenecks": [
+  "recommendations": [
     {
-      "location": "string",
-      "issue": "string",
-      "recommendation": "string"
+      "title": "string (Short descriptive title of the issue/area)",
+      "recommendedAction": "string (The concrete operational action)",
+      "reasoning": "string (Data-backed explanation)",
+      "priorityLevel": "LOW" | "MEDIUM" | "HIGH" | "CRITICAL",
+      "confidenceScore": number (An integer from 0 to 100 representing confidence in this response),
+      "operationalImpact": "string (Expected operational outcome/KPI impact)",
+      "suggestedNextSteps": ["string (Actionable next step task 1)", "string (Actionable next step task 2)", ...]
     }
   ],
-  "staffingAdvice": ["Advice 1...", "Advice 2..."],
   "sustainabilityTip": "string"
 }
 
@@ -116,8 +117,7 @@ function findBestAlternateGate(gates: Gate[], currentGateId: string, excludedGat
  */
 function getStaticFallbackInsights(gates: Gate[], zones: Zone[], activeIncident: Incident | null) {
   const alerts: string[] = [];
-  const bottlenecks: { location: string; issue: string; recommendation: string }[] = [];
-  const staffing: string[] = [];
+  const recommendations: any[] = [];
 
   // Check gates
   const excluded = new Set<string>();
@@ -125,10 +125,18 @@ function getStaticFallbackInsights(gates: Gate[], zones: Zone[], activeIncident:
     if (g.currentWaitTimeMinutes > 30) {
       const altGate = findBestAlternateGate(gates, g.id, excluded);
       excluded.add(altGate.id);
-      bottlenecks.push({
-        location: g.name,
-        issue: `Wait times have reached ${g.currentWaitTimeMinutes} minutes due to high flow density (${g.densityPercent}%).`,
-        recommendation: `Diverting traffic from ${g.name} is recommended. Redirect incoming guests to ${altGate.name} (approx. ${altGate.currentWaitTimeMinutes} min wait time, currently running at ${altGate.densityPercent}% density).`,
+      recommendations.push({
+        title: `Gate Congestion: ${g.name}`,
+        recommendedAction: `Redirect incoming fans from ${g.name} to ${altGate.name}.`,
+        reasoning: `${g.name} has exceeded a 30-minute queue wait time (${g.currentWaitTimeMinutes} mins) with a density of ${g.densityPercent}%. ${altGate.name} is currently underutilized at ${altGate.currentWaitTimeMinutes} min wait.`,
+        priorityLevel: "HIGH",
+        confidenceScore: 92,
+        operationalImpact: "Distributes gate arrival load and decreases overall stadium entry queue times.",
+        suggestedNextSteps: [
+          `Update electronic signage at North Plaza directing fans to ${altGate.name}.`,
+          `Dispatch mobile staff volunteers to point-of-diversion to guide arriving fans.`,
+          `Trigger multilingual app notification for tickets entering through ${g.name}.`
+        ]
       });
     }
   });
@@ -138,7 +146,19 @@ function getStaticFallbackInsights(gates: Gate[], zones: Zone[], activeIncident:
     const fillPercent = Math.round((z.occupancy / z.capacity) * 100);
     if (fillPercent >= 85) {
       alerts.push(`High occupancy warning in ${z.name} (${fillPercent}% capacity).`);
-      staffing.push(`Deploy additional security personnel to ${z.name} to monitor flow at exit portals.`);
+      recommendations.push({
+        title: `Zone Crowd Density: ${z.name}`,
+        recommendedAction: `Deploy extra crowd control staff to ${z.name} exit gates.`,
+        reasoning: `${z.name} is running at ${fillPercent}% capacity. Crowd density is classified as RED.`,
+        priorityLevel: "CRITICAL",
+        confidenceScore: 95,
+        operationalImpact: "Prevents bottlenecks at exit concourses and guarantees clear evacuation routes.",
+        suggestedNextSteps: [
+          `Deploy 4 additional safety stewards to exit gates of ${z.name}.`,
+          `Keep all secondary egress gates in ${z.name} unlocked and monitored.`,
+          `Review zone video feeds from Operations room.`
+        ]
+      });
     }
   });
 
@@ -146,27 +166,42 @@ function getStaticFallbackInsights(gates: Gate[], zones: Zone[], activeIncident:
   if (activeIncident) {
     alerts.push(`Active Incident: ${activeIncident.title} (Status: ${activeIncident.status})`);
     if (activeIncident.status === "REPORTED") {
-      staffing.push(`Action Required: Dispatch staff to ${activeIncident.location.section} immediately.`);
+      recommendations.push({
+        title: `Unresolved Incident: ${activeIncident.title}`,
+        recommendedAction: `Immediately dispatch first response team to ${activeIncident.location.section}.`,
+        reasoning: `An incident categorized as ${activeIncident.category} with severity ${activeIncident.severity} has been logged at ${activeIncident.location.section}. No responder is currently dispatched.`,
+        priorityLevel: activeIncident.severity === "CRITICAL" ? "CRITICAL" : activeIncident.severity === "HIGH" ? "HIGH" : "MEDIUM",
+        confidenceScore: 98,
+        operationalImpact: "Ensures immediate incident resolution and maintains zone safety.",
+        suggestedNextSteps: [
+          `Dispatch closest ${activeIncident.category.toLowerCase()} responder to ${activeIncident.location.section}.`,
+          `Monitor responder response time through the control board.`,
+          `Acknowledge and mark incident as DISPATCHED.`
+        ]
+      });
     }
   }
 
   // Default fallback items if nothing is critical
-  if (bottlenecks.length === 0) {
-    bottlenecks.push({
-      location: "General Entryways",
-      issue: "Flow rates are currently stable across all operational perimeter gates.",
-      recommendation: "Maintain standard operations and gate monitoring.",
+  if (recommendations.length === 0) {
+    recommendations.push({
+      title: "Stable Stadium Operations",
+      recommendedAction: "Maintain standard monitoring parameters across all perimeter gates.",
+      reasoning: "All sensor readings for gate queues and zone capacities are within safe bounds.",
+      priorityLevel: "LOW",
+      confidenceScore: 99,
+      operationalImpact: "Ensures steady, continuous flow of stadium entry and seating.",
+      suggestedNextSteps: [
+        "Continue real-time telemetry feed polling.",
+        "Perform scheduled staff check-ins."
+      ]
     });
-  }
-  if (staffing.length === 0) {
-    staffing.push("Current staffing levels are optimal for all active stadium stands.");
   }
 
   return {
     mode: "fallback",
     criticalAlerts: alerts,
-    bottlenecks,
-    staffingAdvice: staffing,
+    recommendations,
     sustainabilityTip: "Encourage fans exiting near Gate A to board the Downtown Express Shuttle to optimize transit efficiency and maximize CO2 reduction.",
   };
 }
@@ -281,8 +316,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         mode: "live",
         criticalAlerts: parsed.criticalAlerts || [],
-        bottlenecks: parsed.bottlenecks || [],
-        staffingAdvice: parsed.staffingAdvice || [],
+        recommendations: parsed.recommendations || [],
         sustainabilityTip: parsed.sustainabilityTip || "",
       });
     } catch {

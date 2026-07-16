@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Gate, Zone, Incident } from "../../types/stadium";
+import { Gate, Zone, Incident, AIOperationalRecommendation, AIOperationsManagerInsights } from "../../types/stadium";
 
 interface AIInsightPanelProps {
   gates: Gate[];
@@ -7,34 +7,25 @@ interface AIInsightPanelProps {
   activeIncident: Incident | null;
 }
 
-interface Bottleneck {
-  location: string;
-  issue: string;
-  recommendation: string;
-}
-
-interface InsightsData {
-  mode?: "live" | "fallback";
-  criticalAlerts: string[];
-  bottlenecks: Bottleneck[];
-  staffingAdvice: string[];
-  sustainabilityTip: string;
-}
-
 /**
- * AIInsightPanel component.
- * Displays real-time Gemini AI-driven routing recommendations and staff dispatch advice.
- * Fully accessible with proper loading states, aria-live announcements, and high contrast styling.
+ * AIInsightPanel Component
+ *
+ * Acting as the "AI Stadium Operations Manager", this panel consumes live telemetry
+ * and displays data-backed recommendations detailing priority levels, confidence scores,
+ * operational impact, reasoning, and interactive check-off task lists.
  */
 export const AIInsightPanel: React.FC<AIInsightPanelProps> = ({
   gates,
   zones,
   activeIncident,
 }) => {
-  const [insights, setInsights] = useState<InsightsData | null>(null);
+  const [insights, setInsights] = useState<AIOperationsManagerInsights | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+
+  // Track completed steps locally to allow operators to check off completed dispatch tasks.
+  const [completedSteps, setCompletedSteps] = useState<Record<string, boolean>>({});
 
   const fetchInsights = async (isManual = false) => {
     if (!isManual) {
@@ -53,9 +44,8 @@ export const AIInsightPanel: React.FC<AIInsightPanelProps> = ({
         throw new Error("Failed to fetch operational insights.");
       }
 
-      const data: InsightsData = await response.json();
+      const data: AIOperationsManagerInsights = await response.json();
       setInsights(data);
-      console.log(`[AIInsightPanel] Loaded insights. Active Mode: ${data.mode === "live" ? "LIVE (Gemini AI)" : "FALLBACK (Offline Mock)"}`, data);
       setLastUpdated(new Date());
     } catch (err: any) {
       console.error(err);
@@ -65,25 +55,64 @@ export const AIInsightPanel: React.FC<AIInsightPanelProps> = ({
     }
   };
 
-  // Fetch insights initially and when the active incident status changes
   useEffect(() => {
     fetchInsights();
   }, [activeIncident?.id, activeIncident?.status]);
 
-  // Periodically refresh insights every 30 seconds to keep up with telemetry flow
   useEffect(() => {
     const interval = setInterval(() => {
-      fetchInsights(true); // silent updates in background
+      fetchInsights(true);
     }, 30000);
 
     return () => clearInterval(interval);
   }, [gates, zones, activeIncident]);
+
+  const handleStepToggle = (recIdx: number, stepIdx: number) => {
+    const key = `${recIdx}-${stepIdx}`;
+    setCompletedSteps((prev) => ({
+      ...prev,
+      [key]: !prev[key],
+    }));
+  };
+
+  const getPriorityBadgeStyles = (priority: string) => {
+    switch (priority) {
+      case "CRITICAL":
+        return "bg-rose-500/25 border-rose-500/50 text-rose-300";
+      case "HIGH":
+        return "bg-amber-500/25 border-amber-500/50 text-amber-300";
+      case "MEDIUM":
+        return "bg-sky-500/25 border-sky-500/50 text-sky-300";
+      default:
+        return "bg-slate-500/25 border-slate-700/80 text-slate-300";
+    }
+  };
+
+  const getPriorityBorderClass = (priority: string) => {
+    switch (priority) {
+      case "CRITICAL":
+        return "border-rose-500/30 bg-rose-950/5 hover:border-rose-500/50";
+      case "HIGH":
+        return "border-amber-500/30 bg-amber-950/5 hover:border-amber-500/50";
+      case "MEDIUM":
+        return "border-sky-500/30 bg-sky-950/5 hover:border-sky-500/50";
+      default:
+        return "border-slate-800 bg-slate-900/20 hover:border-slate-700";
+    }
+  };
+
+  const getConfidenceColorClass = (score: number) => {
+    if (score >= 90) return "bg-emerald-500";
+    if (score >= 70) return "bg-amber-500";
+    return "bg-rose-500";
+  };
 
   return (
     <section
       className="rounded-xl border border-slate-800 bg-slate-900/60 p-6 shadow-xl backdrop-blur-sm flex flex-col gap-4"
       aria-labelledby="ai-panel-title"
     >
+      {/* Panel Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-800 pb-4 gap-2">
         <div className="flex items-center gap-2">
           <div
@@ -93,7 +122,7 @@ export const AIInsightPanel: React.FC<AIInsightPanelProps> = ({
             ✦
           </div>
           <h2 id="ai-panel-title" className="text-xl font-bold tracking-wide text-white flex items-center gap-2 flex-wrap">
-            <span>AI Operations & Routing Insights</span>
+            <span>AI Operations & Command Hub</span>
             {insights && (
               <span
                 className={`rounded-full px-2.5 py-0.5 text-[9px] font-bold border uppercase tracking-wider ${
@@ -102,7 +131,7 @@ export const AIInsightPanel: React.FC<AIInsightPanelProps> = ({
                     : "bg-amber-500/10 text-amber-400 border-amber-500/20"
                 }`}
               >
-                {insights.mode === "live" ? "Live (Gemini AI)" : "Offline (Fallback)"}
+                {insights.mode === "live" ? "AI Manager Online" : "Rule Engine Fallback"}
               </span>
             )}
           </h2>
@@ -110,7 +139,7 @@ export const AIInsightPanel: React.FC<AIInsightPanelProps> = ({
 
         <div className="flex items-center gap-2">
           {lastUpdated && (
-            <span className="text-[10px] text-slate-500 font-mono">
+            <span className="text-[10px] text-slate-500 font-mono" aria-live="polite">
               Updated: {lastUpdated.toLocaleTimeString()}
             </span>
           )}
@@ -118,22 +147,22 @@ export const AIInsightPanel: React.FC<AIInsightPanelProps> = ({
             onClick={() => fetchInsights(false)}
             disabled={loading}
             className="rounded-md bg-white/5 border border-white/10 hover:bg-white/10 text-slate-300 hover:text-white px-2.5 py-1 text-xs font-semibold transition-all focus:outline-none focus:ring-2 focus:ring-sky-500"
-            aria-label="Manually refresh AI insights"
+            aria-label="Force operational telemetry analysis refresh"
           >
-            {loading ? "Refreshing..." : "Refresh"}
+            {loading ? "Analyzing..." : "Refresh Feed"}
           </button>
         </div>
       </div>
 
-      {/* Loading Skeleton */}
+      {/* Loading State */}
       {loading && !insights && (
         <div
           className="space-y-4"
           role="status"
-          aria-label="AI telemetry analysis loading skeleton"
+          aria-label="AI operations sensor data analysis loading"
         >
           <p className="text-slate-400 text-sm italic mb-2">
-            Simulating real-time sensor processing. Gemini API is analyzing current gate queues, stands density, and active safety incident metrics to draft optimal dispatch recommendations...
+            Aggregating gate telemetry, stand occupancies, safety incident boards, and accessibility routes. Gemini operations manager is drafting recommendations...
           </p>
           <div className="space-y-3 animate-pulse">
             <div className="h-4 bg-slate-800/80 rounded-md w-3/4" />
@@ -143,25 +172,25 @@ export const AIInsightPanel: React.FC<AIInsightPanelProps> = ({
         </div>
       )}
 
-      {/* Error State */}
+      {/* Error Alert */}
       {error && (
         <div
           className="rounded-lg bg-rose-500/10 border border-rose-500/25 p-4 text-sm text-rose-400 font-medium"
           role="alert"
         >
-          <span className="font-bold">Operational Alert:</span> {error}
+          <span className="font-bold">Operations Alert:</span> {error}
         </div>
       )}
 
-      {/* Insights Content */}
+      {/* Dynamic Content */}
       {insights && (
         <div className="space-y-5" aria-live="polite">
           
-          {/* Critical Alerts */}
+          {/* Critical Alerts Banner List */}
           {insights.criticalAlerts && insights.criticalAlerts.length > 0 && (
             <div className="space-y-2">
-              <h3 className="text-xs font-semibold text-rose-400 uppercase tracking-wider">
-                Critical Notifications
+              <h3 className="text-xs font-bold text-rose-400 uppercase tracking-wider">
+                Critical Telemetry Violations
               </h3>
               <div className="grid grid-cols-1 gap-2">
                 {insights.criticalAlerts.map((alert, idx) => (
@@ -177,54 +206,108 @@ export const AIInsightPanel: React.FC<AIInsightPanelProps> = ({
             </div>
           )}
 
-          {/* Bottlenecks & Redirections */}
+          {/* AI Recommendations */}
           <div>
-            <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
-              Active Perimeter Bottlenecks
+            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">
+              Strategic Dispatch Directives
             </h3>
-            <div className="space-y-3">
-              {insights.bottlenecks && insights.bottlenecks.length > 0 ? (
-                insights.bottlenecks.map((b, idx) => (
-                  <div
-                    key={idx}
-                    className="rounded-lg border border-slate-800 bg-slate-900/30 p-4 space-y-2 hover:border-slate-700 transition-colors"
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="font-bold text-white text-sm">{b.location}</span>
-                      <span className="rounded bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 text-[10px] font-bold text-amber-400 uppercase tracking-wide">
-                        Redirection Recommended
-                      </span>
-                    </div>
-                    <p className="text-xs text-slate-300">{b.issue}</p>
-                    <div className="pt-2 border-t border-white/5 text-xs text-sky-400 font-medium">
-                      <span className="font-bold text-sky-300">Action: </span>
-                      {b.recommendation}
-                    </div>
-                  </div>
-                ))
+            
+            <div className="space-y-4">
+              {insights.recommendations && insights.recommendations.length > 0 ? (
+                insights.recommendations.map((rec, recIdx) => {
+                  const borderClass = getPriorityBorderClass(rec.priorityLevel);
+                  const badgeStyles = getPriorityBadgeStyles(rec.priorityLevel);
+                  const confidenceColor = getConfidenceColorClass(rec.confidenceScore);
+
+                  return (
+                    <article
+                      key={recIdx}
+                      className={`rounded-lg border p-4 space-y-3 transition-colors duration-200 ${borderClass}`}
+                    >
+                      {/* Priority, Title, and Confidence Row */}
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className={`rounded border px-2 py-0.5 text-[9px] font-extrabold tracking-wider uppercase ${badgeStyles}`}>
+                            {rec.priorityLevel}
+                          </span>
+                          <h4 className="font-bold text-white text-sm tracking-wide">
+                            {rec.title}
+                          </h4>
+                        </div>
+                        
+                        {/* Confidence Meter */}
+                        <div className="flex items-center gap-2" title={`Operational Confidence Level: ${rec.confidenceScore}%`}>
+                          <span className="text-[10px] text-slate-400 font-semibold font-mono">
+                            Conf: {rec.confidenceScore}%
+                          </span>
+                          <div className="w-16 bg-slate-800 h-1.5 rounded-full overflow-hidden" aria-hidden="true">
+                            <div className={`h-full rounded-full ${confidenceColor}`} style={{ width: `${rec.confidenceScore}%` }} />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Recommended Action */}
+                      <div className="text-xs text-sky-300 font-semibold bg-sky-950/20 border border-sky-500/10 rounded px-2.5 py-1.5">
+                        <span className="text-sky-400 uppercase font-bold mr-1">Directive:</span>
+                        {rec.recommendedAction}
+                      </div>
+
+                      {/* Reasoning */}
+                      <p className="text-xs text-slate-300 leading-relaxed italic bg-black/10 p-2 rounded">
+                        <span className="text-[10px] uppercase font-bold text-slate-400 block not-italic mb-0.5">Reasoning:</span>
+                        {rec.reasoning}
+                      </p>
+
+                      {/* Operational Impact */}
+                      {rec.operationalImpact && (
+                        <div className="text-xs text-slate-400">
+                          <strong className="text-slate-300 font-bold">Projected Outcome: </strong>
+                          {rec.operationalImpact}
+                        </div>
+                      )}
+
+                      {/* Suggested Next Steps Checklist */}
+                      {rec.suggestedNextSteps && rec.suggestedNextSteps.length > 0 && (
+                        <div className="pt-2 border-t border-white/5 space-y-2">
+                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                            Suggested Execution Checklist
+                          </span>
+                          <ul className="space-y-1.5" aria-label="Actionable next step checklist">
+                            {rec.suggestedNextSteps.map((step, stepIdx) => {
+                              const isChecked = !!completedSteps[`${recIdx}-${stepIdx}`];
+                              return (
+                                <li key={stepIdx} className="flex items-start gap-2.5">
+                                  <input
+                                    type="checkbox"
+                                    id={`step-${recIdx}-${stepIdx}`}
+                                    checked={isChecked}
+                                    onChange={() => handleStepToggle(recIdx, stepIdx)}
+                                    className="mt-0.5 h-3.5 w-3.5 rounded border-slate-700 bg-slate-800 text-sky-500 focus:ring-sky-500 focus:ring-offset-slate-900 cursor-pointer"
+                                  />
+                                  <label
+                                    htmlFor={`step-${recIdx}-${stepIdx}`}
+                                    className={`text-xs cursor-pointer select-none transition-colors ${
+                                      isChecked ? "text-slate-500 line-through" : "text-slate-300 hover:text-white"
+                                    }`}
+                                  >
+                                    {step}
+                                  </label>
+                                </li>
+                              );
+                            })}
+                          </ul>
+                        </div>
+                      )}
+                    </article>
+                  );
+                })
               ) : (
-                <p className="text-xs text-slate-500 italic">No entry bottlenecks detected.</p>
+                <p className="text-xs text-slate-500 italic">No entry bottlenecks or directives catalogued.</p>
               )}
             </div>
           </div>
 
-          {/* Staffing Guidance */}
-          {insights.staffingAdvice && insights.staffingAdvice.length > 0 && (
-            <div>
-              <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
-                Operational Staffing Advice
-              </h3>
-              <ul className="space-y-1.5 text-xs text-slate-300 list-inside list-disc pl-1">
-                {insights.staffingAdvice.map((advice, idx) => (
-                  <li key={idx} className="leading-relaxed">
-                    {advice}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          {/* Sustainability Offset tip */}
+          {/* Sustainability Tip */}
           {insights.sustainabilityTip && (
             <div className="rounded-lg bg-emerald-500/10 border border-emerald-500/20 p-4">
               <div className="flex items-center gap-2 mb-1">

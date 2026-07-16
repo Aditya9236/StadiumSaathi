@@ -50,7 +50,8 @@ The following optimisations are implemented in the current codebase:
 - **Next.js App Router + Turbopack**: The development build uses Next.js 16's Turbopack bundler (cold start < 1 s). Production static pages (`/`, `/dashboard`, `/fan`) are pre-rendered at build time; API routes are server-rendered on demand only when called.
 - **Server-side AI calls — zero API key exposure on the client**: All Gemini API calls happen exclusively inside Next.js API routes (`/api/dashboard-insights`, `/api/ai-recommendation`). The `GEMINI_API_KEY` is never included in any client bundle or network response, minimising both security risk and client-side bundle size.
 - **`'use client'` boundary scoped to leaf pages only**: The `'use client'` directive is placed at the top of `dashboard/page.tsx` and `fan/page.tsx` — never in shared layout or server components — ensuring the RSC (React Server Component) boundary is respected and server components remain zero-JS.
-- **`useCallback` for map interaction handler**: The `handleMapGateSelect` function in `fan/page.tsx` is wrapped in `useCallback` to prevent unnecessary re-renders of the `StadiumMap` SVG component on unrelated state changes.
+- **`useMemo` for all derived dashboard metrics**: Gate lists, total flow rate, average wait time, total occupancy, overall density percent, and redirection suggestions are all wrapped in `useMemo` with correct dependency arrays, so they are only recalculated when the underlying telemetry state changes — not on every 10 s state tick.
+- **`useCallback` for all event handlers**: All dashboard event handlers (`handleSimulateIncident`, `handleDispatchIncident`, `handleResolveIncident`, `handleDismissIncident`, `handleSendBroadcast`) and the map interaction handler (`handleMapGateSelect` in `fan/page.tsx`) are wrapped in `useCallback`, preventing new function reference creation on every render and eliminating unnecessary child re-renders.
 - **Interval cleanup on unmount**: All `setInterval` and `setTimeout` calls in `useEffect` hooks return cleanup functions, preventing memory leaks during client-side navigation.
 - **Graceful AI fallback**: Both AI API routes fall back to pre-computed static responses without any additional network round-trip if the Gemini API key is absent or the upstream returns an error, so the UI never blocks or hangs.
 
@@ -67,6 +68,7 @@ The following optimisations are implemented in the current codebase:
 | Data | Simulated real-time telemetry (in-memory singleton) |
 | Accessibility | WCAG 2.1 AA — semantic HTML, ARIA, keyboard navigation |
 | i18n | Custom `translations.ts` module (en / es / fr) |
+| Testing | Vitest — 11 automated unit tests across 4 utility modules |
 
 ---
 
@@ -94,7 +96,10 @@ src/
 ├── data/
 │   └── stadiumData.ts              # Mock telemetry, POIs, transit routes, incident templates
 ├── lib/
-│   └── translations.ts             # en / es / fr translation strings
+│   ├── translations.ts             # en / es / fr translation strings
+│   ├── utils.ts                    # Pure utility functions (density, capacity, severity, sanitization)
+│   ├── utils.test.ts               # Vitest unit tests (11 tests)
+│   └── rateLimiter.ts              # In-memory sliding-window rate limiter
 └── types/
     └── stadium.ts                  # TypeScript interfaces (Gate, Zone, Incident, TransitRoute, …)
 docs/

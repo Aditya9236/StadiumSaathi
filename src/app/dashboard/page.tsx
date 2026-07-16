@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
+import { sanitizeBroadcastMessage } from "../../lib/utils";
 import { Gate, Zone, Incident } from "../../types/stadium";
 import {
   initialGates,
@@ -79,59 +80,68 @@ export default function OrganizerDashboard() {
     return () => clearInterval(timer);
   }, [gates, zones, selectedZone]);
 
-  // ─── Incident Actions ────────────────────────────────────────────────────
-  const handleSimulateIncident = () => {
+  // ─── Incident Actions — useCallback to avoid passing new fn refs on every render ─
+  const handleSimulateIncident = useCallback(() => {
     setActiveIncident(generateRandomIncident());
-  };
+  }, []);
 
-  const handleDispatchIncident = (incidentId: string) => {
-    if (activeIncident?.id === incidentId) {
-      setActiveIncident({
-        ...activeIncident,
-        status: "DISPATCHED",
-        dispatchedAt: new Date().toISOString(),
-      });
-    }
-  };
+  const handleDispatchIncident = useCallback((incidentId: string) => {
+    setActiveIncident((prev) => {
+      if (prev?.id === incidentId) {
+        return { ...prev, status: "DISPATCHED", dispatchedAt: new Date().toISOString() };
+      }
+      return prev;
+    });
+  }, []);
 
-  const handleResolveIncident = () => {
-    if (activeIncident) {
-      setActiveIncident({
-        ...activeIncident,
-        status: "RESOLVED",
-        resolvedAt: new Date().toISOString(),
-      });
+  const handleResolveIncident = useCallback(() => {
+    setActiveIncident((prev) => {
+      if (!prev) return null;
+      const resolved = { ...prev, status: "RESOLVED" as const, resolvedAt: new Date().toISOString() };
       setTimeout(() => setActiveIncident(null), 2000);
-    }
-  };
+      return resolved;
+    });
+  }, []);
 
-  const handleDismissIncident = () => setActiveIncident(null);
+  const handleDismissIncident = useCallback(() => setActiveIncident(null), []);
 
   // ─── Broadcast ───────────────────────────────────────────────────────────
-  const handleSendBroadcast = () => {
-    const { sanitizeBroadcastMessage } = require("../../lib/utils");
+  const handleSendBroadcast = useCallback(() => {
     const sanitized = sanitizeBroadcastMessage(broadcastDraft);
     if (!sanitized) return;
     setActiveBroadcast(sanitized);
     setBroadcastSent(true);
     setBroadcastDraft("");
     setTimeout(() => setBroadcastSent(false), 3000);
-  };
+  }, [broadcastDraft]);
 
-  // ─── Derived Metrics ─────────────────────────────────────────────────────
-  const openGates = gates.filter((g) => g.status === "OPEN" || g.status === "RESTRICTED");
-  const totalFlowRate = openGates.reduce((s, g) => s + g.passengerFlowRate, 0);
-  const avgWaitTime = openGates.length
-    ? Math.round(openGates.reduce((s, g) => s + g.currentWaitTimeMinutes, 0) / openGates.length)
-    : 0;
-  const totalOccupancy = zones.reduce((s, z) => s + z.occupancy, 0);
-  const totalCapacity = zones.reduce((s, z) => s + z.capacity, 0);
-  const overallDensityPercent = Math.round((totalOccupancy / totalCapacity) * 100);
+  // ─── Derived Metrics — useMemo to prevent recalculation on unrelated state changes ─
+  const openGates = useMemo(
+    () => gates.filter((g) => g.status === "OPEN" || g.status === "RESTRICTED"),
+    [gates]
+  );
+  const totalFlowRate = useMemo(
+    () => openGates.reduce((s, g) => s + g.passengerFlowRate, 0),
+    [openGates]
+  );
+  const avgWaitTime = useMemo(
+    () =>
+      openGates.length
+        ? Math.round(openGates.reduce((s, g) => s + g.currentWaitTimeMinutes, 0) / openGates.length)
+        : 0,
+    [openGates]
+  );
+  const totalOccupancy = useMemo(() => zones.reduce((s, z) => s + z.occupancy, 0), [zones]);
+  const totalCapacity = useMemo(() => zones.reduce((s, z) => s + z.capacity, 0), [zones]);
+  const overallDensityPercent = useMemo(
+    () => Math.round((totalOccupancy / totalCapacity) * 100),
+    [totalOccupancy, totalCapacity]
+  );
 
-  const getRedirectionSuggestions = (): string[] => {
+  const redirectionSuggestions = useMemo(() => {
     const suggestions = gates.filter((g) => g.status === "OPEN" && g.densityPercent < 50).map((g) => g.name);
     return suggestions.length > 0 ? suggestions.slice(0, 2) : ["Gate D - South Gate"];
-  };
+  }, [gates]);
 
   // ─── Render ───────────────────────────────────────────────────────────────
   return (
@@ -371,7 +381,7 @@ export default function OrganizerDashboard() {
                     <div className="pt-2 border-t border-sky-500/20">
                       <span className="text-xs font-semibold uppercase tracking-wider text-amber-400 block mb-1">{tr.congestionRedirectionPlan}:</span>
                       <ul className="list-disc list-inside mt-1 text-xs font-bold text-white">
-                        {getRedirectionSuggestions().map((gateName, i) => <li key={i}>{gateName}</li>)}
+                        {redirectionSuggestions.map((gateName, i) => <li key={i}>{gateName}</li>)}
                       </ul>
                     </div>
                   )}

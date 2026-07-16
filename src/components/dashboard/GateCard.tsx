@@ -9,7 +9,7 @@ interface GateCardProps {
  * Reusable Card component representing a stadium gate's telemetry.
  * Conforms to WCAG 2.1 AA accessibility guidelines.
  */
-export const GateCard: React.FC<GateCardProps> = ({ gate }) => {
+export const GateCard = React.memo<GateCardProps>(({ gate }) => {
   const { name, status, currentWaitTimeMinutes, passengerFlowRate, densityPercent } = gate;
 
   // Determine color coding & textual status based on density percentage
@@ -88,4 +88,6 @@ export const GateCard: React.FC<GateCardProps> = ({ gate }) => {
       </div>
     </article>
   );
-};
+});
+
+GateCard.displayName = "GateCard";
